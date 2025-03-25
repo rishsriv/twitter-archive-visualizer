@@ -70,6 +70,7 @@ const Button = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;
+  margin: 0 0.5rem;
 
   &:hover {
     background-color: #1a91da;
@@ -78,6 +79,14 @@ const Button = styled.button`
   &:disabled {
     background-color: #ccc;
     cursor: not-allowed;
+  }
+`;
+
+const DemoButton = styled(Button)`
+  background-color: #15202b;
+  
+  &:hover {
+    background-color: #273340;
   }
 `;
 
@@ -97,6 +106,7 @@ const DataLoader = ({ onDataLoaded }) => {
   const [file, setFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef(null);
+  const [isLoadingDemo, setIsLoadingDemo] = useState(false);
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
@@ -205,11 +215,87 @@ const DataLoader = ({ onDataLoaded }) => {
     reader.readAsText(fileToProcess);
   };
 
+  const handleLoadDemoData = () => {
+    setIsLoadingDemo(true);
+    setError(null);
+
+    // Get the base URL based on the current environment
+    const baseUrl = process.env.PUBLIC_URL || '';
+    const demoFileUrl = `${baseUrl}/assets/tweets.js`;
+    
+    console.log('Attempting to load demo data from:', demoFileUrl);
+    
+    // Fetch the demo tweets.js file
+    fetch(demoFileUrl)
+      .then(response => {
+        console.log('Response status:', response.status, response.statusText);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load demo data: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get content type to help with debugging
+        const contentType = response.headers.get('content-type');
+        console.log('Content type:', contentType);
+        
+        return response.text().then(text => {
+          // Log the first 100 characters to see what we're getting
+          console.log('Response preview:', text.substring(0, 100));
+          return text;
+        });
+      })
+      .then(content => {
+        try {
+          // Need to remove the window assignment part and get only the JSON
+          // First check if the content seems to be an HTML response (which would indicate an error)
+          if (content.trim().startsWith('<!DOCTYPE') || content.trim().startsWith('<html')) {
+            throw new Error('Received HTML instead of tweets.js data');
+          }
+          
+          console.log('Processing tweets data...');
+          // Try to extract the JSON part
+          const jsonStr = content.replace(/^window\.YTD\.tweets\.part0\s*=\s*/, '');
+          
+          // Log a small sample of the processed string for debugging
+          console.log('Processed JSON string preview:', jsonStr.substring(0, 100));
+          
+          const tweetsData = JSON.parse(jsonStr);
+          
+          // Parse data
+          const parsedTweets = parseTweets(tweetsData);
+          const timelineData = aggregateTweetsByTimePeriod(parsedTweets, 'month');
+          const sourceStats = getTweetSourceStats(parsedTweets);
+          const stats = getOverallStats(parsedTweets);
+          
+          // Call the callback with the processed data
+          onDataLoaded({
+            tweets: parsedTweets,
+            timelineData,
+            sources: sourceStats,
+            overallStats: stats
+          });
+          
+          setIsLoadingDemo(false);
+        } catch (err) {
+          console.error('Error processing demo data:', err);
+          setError('There was an error processing the demo data.');
+          setIsLoadingDemo(false);
+        }
+      })
+      .catch(err => {
+        console.error('Error loading demo data:', err);
+        const errorDetails = err.message || 'Unknown error';
+        setError(`Failed to load demo data: ${errorDetails}. Check console for details.`);
+        setIsLoadingDemo(false);
+      });
+  };
+
   return (
     <Container>
       <Title>Twitter Archive Dashboard</Title>
       <Description>
-        Upload your Twitter archive's tweets.js file to visualize your Twitter activity and engagement metrics over time.
+        Upload your Twitter archive's tweets.js file to visualize your Twitter activity and engagement metrics over time. 
+        No Twitter archive? Use our demo data to explore the dashboard features.
       </Description>
       
       <UploadArea 
@@ -232,11 +318,21 @@ const DataLoader = ({ onDataLoaded }) => {
         />
       </UploadArea>
       
-      <Button onClick={handleProcessData} disabled={!file || isLoading}>
-        {isLoading ? 'Processing...' : 'Generate Dashboard'}
-      </Button>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem' }}>
+        <Button onClick={handleProcessData} disabled={!file || isLoading || isLoadingDemo}>
+          {isLoading ? 'Processing...' : 'Generate Dashboard'}
+        </Button>
+        
+        <DemoButton onClick={handleLoadDemoData} disabled={isLoading || isLoadingDemo}>
+          {isLoadingDemo ? 'Loading demo...' : 'Try Demo Data'}
+        </DemoButton>
+      </div>
       
-      {isLoading && <LoadingText>Processing your Twitter data...</LoadingText>}
+      <UploadSubtext style={{ marginTop: '1rem' }}>
+        Don't have a tweets.js file? Click "Try Demo Data" to see how it works.
+      </UploadSubtext>
+      
+      {(isLoading || isLoadingDemo) && <LoadingText>Processing Twitter data...</LoadingText>}
       {error && <ErrorText>{error}</ErrorText>}
     </Container>
   );
