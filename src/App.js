@@ -6,7 +6,7 @@ import { filterTweetsByType, filterTweetsByDateRange } from './utils/twitterData
 function App() {
   const [twitterData, setTwitterData] = useState(null);
   const [filteredTweets, setFilteredTweets] = useState(null);
-  const [showMainTweetsOnly, setShowMainTweetsOnly] = useState(false);
+  const [showMainTweetsOnly, setShowMainTweetsOnly] = useState(true);
   const [dateRange, setDateRange] = useState(null);
 
   const handleDataLoaded = (data) => {

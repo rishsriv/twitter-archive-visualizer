@@ -207,7 +207,7 @@ const Dashboard = ({
   };
 
   const resetFilters = () => {
-    setShowMainTweetsOnly(false);
+    setShowMainTweetsOnly(true); // Keep main tweets filter on by default
     // Reset date range to full range
     if (initialOverallStats) {
       setDateRange({
